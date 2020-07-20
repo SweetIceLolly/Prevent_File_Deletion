@@ -107,7 +107,27 @@ Data->IoStatus.Information = 0;
 ret = FLT_PREOP_COMPLETE;
 ```
 
+# UPDATE: Prevent file modification
+To prevent file modification, we can check flags in `Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess`. The following code will prevent rename, delete, modify and property change (Not strictly tested though). If we want to prevent the file from being read, we can deny the access when related `DesiredAccess` flag is detected.
+
+```c
+if (FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, FILE_WRITE_DATA) ||
+    FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, FILE_WRITE_ATTRIBUTES) ||
+    FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, FILE_WRITE_EA) ||
+    FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, FILE_APPEND_DATA) ||
+    FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, DELETE) ||
+    FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, WRITE_DAC) ||
+    FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, WRITE_OWNER) ||
+    FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, GENERIC_WRITE)) {
+
+    Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+    Data->IoStatus.Information = 0;
+    ret = FLT_PREOP_COMPLETE;
+}
+```
+
 # What to do next
 1. Currently, loading the driver will return an error code that indicates `An instance of the service is already running`. I don't know why, because there is no an intance of the service is already running.
-2. Loading the driver for a second time will fail to register the minifilter, I don't know why.
-3. I will need to figure out how to prevent file creation and modification.
+2. Loading the driver for a second time will fail to register the minifilter, I don't know why. (Update: I found that reinstall the service will solve the problem, but still don't know why).
+3. I will need to figure out how to prevent file creation and modification. (Solved)
+4. I found that the minifilter will be loaded even if I whatever path I specified in the driver loader. This is weird! Maybe it's because the system puts the newly installed minifilter driver into a "pending to load" list, and it will be loaded as soon as some program loads other drivers? I don't know.

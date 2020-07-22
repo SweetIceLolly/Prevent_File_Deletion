@@ -126,8 +126,18 @@ if (FlagOn(Data->Iopb->Parameters.Create.SecurityContext->DesiredAccess, FILE_WR
 }
 ```
 
+# UPDATE: Find out which process requested the operation
+To find out which process requested the operation, we can use `Data->Thread`.
+```c
+PEPROCESS TargetProcess = IoThreadToProcess(Data->Thread);
+HANDLE Pid = PsGetProcessId(TargetProcess);
+PUNICODE_STRING ProcessName = NULL;
+SeLocateProcessImageName(TargetProcess, &ProcessName);
+```
+
 # What to do next
 1. Currently, loading the driver will return an error code that indicates `An instance of the service is already running`. I don't know why, because there is no an intance of the service is already running.
 2. Loading the driver for a second time will fail to register the minifilter, I don't know why. (Update: I found that reinstall the service will solve the problem, but still don't know why).
 3. I will need to figure out how to prevent file creation and modification. (Solved)
 4. I found that the minifilter will be loaded even if I whatever path I specified in the driver loader. This is weird! Maybe it's because the system puts the newly installed minifilter driver into a "pending to load" list, and it will be loaded as soon as some program loads other drivers? I don't know.
+5. HRSword can delete/rename protected files without the specific `DesiredAccess`. Maybe it is because it simply passes the file handle to the kernel-mode driver and let the driver to finish the job? I am not sure.
